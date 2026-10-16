@@ -1,0 +1,53 @@
+# Beispiel-Helfer für den Blueprint "IKEA BILRESA + MYGGBETT – Lichtsteuerung"
+# Als Package einbinden (configuration.yaml → homeassistant: packages: !include_dir_named packages)
+# oder die Helfer äquivalent über die UI (Einstellungen → Geräte & Dienste → Helfer) anlegen.
+
+input_select:
+  wz_licht_modus:
+    name: Wohnzimmer Lichtmodus
+    options: [automatik, bewegung, schalter_an, schalter_aus]
+    initial: automatik
+    icon: mdi:lightbulb-auto
+
+input_number:
+  wz_helligkeit_schalter:
+    name: Helligkeit Schalter
+    min: 1
+    max: 100
+    step: 1
+    initial: 80
+    unit_of_measurement: "%"
+    icon: mdi:light-switch
+  wz_helligkeit_bewegung:
+    name: Helligkeit Bewegung (Tag)
+    min: 1
+    max: 100
+    step: 1
+    initial: 60
+    unit_of_measurement: "%"
+    icon: mdi:motion-sensor
+  wz_helligkeit_bewegung_nacht:
+    name: Helligkeit Bewegung (Nacht)
+    min: 1
+    max: 100
+    step: 1
+    initial: 5
+    unit_of_measurement: "%"
+    icon: mdi:weather-night
+
+timer:
+  wz_licht_nachlauf:
+    name: Wohnzimmer Nachlauf
+  wz_bypass_reset:
+    name: Wohnzimmer Bypass-Reset
+
+schedule:
+  wz_nacht:
+    name: Nachtmodus Wohnzimmer
+    monday:    [{ from: "00:00:00", to: "06:30:00" }, { from: "22:30:00", to: "24:00:00" }]
+    tuesday:   [{ from: "00:00:00", to: "06:30:00" }, { from: "22:30:00", to: "24:00:00" }]
+    wednesday: [{ from: "00:00:00", to: "06:30:00" }, { from: "22:30:00", to: "24:00:00" }]
+    thursday:  [{ from: "00:00:00", to: "06:30:00" }, { from: "22:30:00", to: "24:00:00" }]
+    friday:    [{ from: "00:00:00", to: "07:30:00" }, { from: "23:30:00", to: "24:00:00" }]
+    saturday:  [{ from: "00:00:00", to: "07:30:00" }, { from: "23:30:00", to: "24:00:00" }]
+    sunday:    [{ from: "00:00:00", to: "06:30:00" }, { from: "22:30:00", to: "24:00:00" }]

@@ -1,0 +1,444 @@
+blueprint:
+  name: IKEA BILRESA + MYGGBETT – Lichtsteuerung mit lernbarer Helligkeit
+  description: >
+    Steuert ein Licht über einen IKEA BILRESA Taster (2 Tasten, Matter) und einen
+    IKEA MYGGBETT Bewegungsmelder (Matter).
+
+
+    **Verhalten**
+
+    - Bewegung schaltet das Licht im Automatik-Modus ein (Tag-/Nacht-Helligkeit) und nach
+      einem Nachlauf ohne Bewegung wieder aus.
+
+    - Taste 1 kurz: Licht an mit Schalter-Helligkeit, Bewegungslogik pausiert (Bypass).
+
+    - Taste 2 kurz: Licht aus, Bewegung schaltet nicht wieder ein (Bypass).
+
+    - Taste 1 / 2 lang: Heller / Dunkler dimmen. Beim Loslassen wird die neue Helligkeit
+      in den passenden Helfer gespeichert (Schalter, Bewegung Tag oder Bewegung Nacht) und
+      zukünftig verwendet.
+
+    - Der Bypass endet automatisch, sobald der Raum eine konfigurierbare Zeit leer war.
+
+    - Nachts (Schedule/Binary Sensor) nutzt Bewegung immer die niedrige Nacht-Helligkeit,
+      der Schalter arbeitet mit normaler Helligkeit.
+
+
+    **Benötigte Helfer** (vorher anlegen): ein `input_select` mit den Optionen
+    `automatik`, `bewegung`, `schalter_an`, `schalter_aus`; drei `input_number` (1–100 %)
+    für Schalter-, Bewegung-Tag- und Bewegung-Nacht-Helligkeit; zwei `timer`
+    (Nachlauf, Bypass-Reset).
+  domain: automation
+  source_url: https://github.com/jancwe/ha-blueprints/blob/main/blueprints/automation/jancwe/bilresa_myggbett_light.yaml
+  author: jancwe
+  input:
+    geraete:
+      name: Geräte
+      icon: mdi:devices
+      input:
+        licht:
+          name: Licht
+          selector:
+            target:
+              entity:
+                domain: light
+        bewegungsmelder:
+          name: MYGGBETT Bewegungsmelder
+          selector:
+            entity:
+              domain: binary_sensor
+              device_class:
+                - occupancy
+                - motion
+        taste_oben:
+          name: BILRESA Taste 1 (oben)
+          description: Event-Entität der oberen Taste
+          selector:
+            entity:
+              domain: event
+        taste_unten:
+          name: BILRESA Taste 2 (unten)
+          description: Event-Entität der unteren Taste
+          selector:
+            entity:
+              domain: event
+    helfer:
+      name: Helfer
+      icon: mdi:toolbox
+      input:
+        modus:
+          name: Modus (input_select)
+          description: "Optionen: automatik, bewegung, schalter_an, schalter_aus"
+          selector:
+            entity:
+              domain: input_select
+        helligkeit_schalter:
+          name: Helligkeit Schalter (input_number, %)
+          selector:
+            entity:
+              domain: input_number
+        helligkeit_bewegung:
+          name: Helligkeit Bewegung Tag (input_number, %)
+          selector:
+            entity:
+              domain: input_number
+        helligkeit_bewegung_nacht:
+          name: Helligkeit Bewegung Nacht (input_number, %)
+          selector:
+            entity:
+              domain: input_number
+        timer_nachlauf:
+          name: Timer Nachlauf
+          selector:
+            entity:
+              domain: timer
+        timer_bypass:
+          name: Timer Bypass-Reset
+          selector:
+            entity:
+              domain: timer
+        nacht_entity:
+          name: Nachtmodus (optional)
+          description: >
+            schedule, binary_sensor oder input_boolean. Ist der Zustand "on", gilt Nacht.
+            Leer lassen = nie Nacht.
+          default: ""
+          selector:
+            entity:
+              domain:
+                - schedule
+                - binary_sensor
+                - input_boolean
+    zeiten:
+      name: Zeiten & Dimmen
+      icon: mdi:timer-cog
+      input:
+        nachlauf_minuten:
+          name: Nachlauf nach letzter Bewegung
+          default: 4
+          selector:
+            number:
+              min: 1
+              max: 60
+              unit_of_measurement: min
+        bypass_minuten:
+          name: Bypass aufheben wenn Raum leer seit
+          default: 30
+          selector:
+            number:
+              min: 5
+              max: 240
+              step: 5
+              unit_of_measurement: min
+        dimm_schritt:
+          name: Dimmschritt pro Intervall
+          default: 8
+          selector:
+            number:
+              min: 1
+              max: 25
+              unit_of_measurement: "%"
+        dimm_intervall_ms:
+          name: Dimm-Intervall
+          default: 450
+          selector:
+            number:
+              min: 200
+              max: 1500
+              step: 50
+              unit_of_measurement: ms
+        nacht_lernen:
+          name: Nacht-Helligkeit per Dimmer lernen
+          description: Wenn aus, bleibt die Nacht-Helligkeit fix (nur per UI änderbar).
+          default: true
+          selector:
+            boolean:
+        event_kurz:
+          name: Event-Typ "kurzer Druck"
+          description: Wert des Attributs event_type für einen kurzen Tastendruck (Loslassen)
+          default: short_release
+          selector:
+            text:
+        event_lang:
+          name: Event-Typ "langer Druck"
+          default: long_press
+          selector:
+            text:
+
+mode: parallel
+max: 10
+max_exceeded: silent
+
+trigger_variables:
+  taste_oben: !input taste_oben
+  taste_unten: !input taste_unten
+
+variables:
+  licht: !input licht
+  bewegungsmelder: !input bewegungsmelder
+  modus: !input modus
+  helligkeit_schalter: !input helligkeit_schalter
+  helligkeit_bewegung: !input helligkeit_bewegung
+  helligkeit_bewegung_nacht: !input helligkeit_bewegung_nacht
+  timer_nachlauf: !input timer_nachlauf
+  timer_bypass: !input timer_bypass
+  nacht_entity: !input nacht_entity
+  nachlauf_minuten: !input nachlauf_minuten
+  bypass_minuten: !input bypass_minuten
+  dimm_schritt: !input dimm_schritt
+  dimm_intervall_ms: !input dimm_intervall_ms
+  nacht_lernen: !input nacht_lernen
+  event_kurz: !input event_kurz
+  event_lang: !input event_lang
+  ist_nacht: "{{ nacht_entity != '' and is_state(nacht_entity, 'on') }}"
+  licht_entity: >
+    {% if licht.entity_id is defined %}
+      {{ licht.entity_id if licht.entity_id is string else licht.entity_id[0] }}
+    {% else %}{{ none }}{% endif %}
+  nachlauf_dauer: "{{ '%02d:%02d:00' % ((nachlauf_minuten | int) // 60, (nachlauf_minuten | int) % 60) }}"
+  bypass_dauer: "{{ '%02d:%02d:00' % ((bypass_minuten | int) // 60, (bypass_minuten | int) % 60) }}"
+
+triggers:
+  - trigger: state
+    entity_id: !input bewegungsmelder
+    to: "on"
+    id: bewegung_an
+  - trigger: state
+    entity_id: !input bewegungsmelder
+    to: "off"
+    id: bewegung_aus
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_nachlauf
+    id: nachlauf_fertig
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_bypass
+    id: bypass_fertig
+  - trigger: state
+    entity_id: !input taste_oben
+    id: oben
+  - trigger: state
+    entity_id: !input taste_unten
+    id: unten
+
+conditions:
+  # Bei Tasten-Triggern nur auf relevante Event-Typen reagieren
+  - condition: template
+    value_template: >
+      {{ trigger.id not in ['oben', 'unten']
+         or (trigger.to_state is not none
+             and trigger.to_state.attributes.event_type in [event_kurz, event_lang]) }}
+
+actions:
+  - choose:
+      # ---------------- Bewegung erkannt ----------------
+      - conditions: "{{ trigger.id == 'bewegung_an' }}"
+        sequence:
+          - action: timer.cancel
+            target:
+              entity_id:
+                - !input timer_nachlauf
+                - !input timer_bypass
+          - if:
+              - condition: state
+                entity_id: !input modus
+                state: automatik
+            then:
+              - action: light.turn_on
+                target: !input licht
+                data:
+                  brightness_pct: >
+                    {{ states(helligkeit_bewegung_nacht) | int(5) if ist_nacht
+                       else states(helligkeit_bewegung) | int(60) }}
+                  transition: 1
+              - action: input_select.select_option
+                target:
+                  entity_id: !input modus
+                data:
+                  option: bewegung
+
+      # ---------------- Bewegung beendet ----------------
+      - conditions: "{{ trigger.id == 'bewegung_aus' }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: state
+                    entity_id: !input modus
+                    state: bewegung
+                sequence:
+                  - action: timer.start
+                    target:
+                      entity_id: !input timer_nachlauf
+                    data:
+                      duration: "{{ nachlauf_dauer }}"
+              - conditions:
+                  - condition: state
+                    entity_id: !input modus
+                    state:
+                      - schalter_an
+                      - schalter_aus
+                sequence:
+                  - action: timer.start
+                    target:
+                      entity_id: !input timer_bypass
+                    data:
+                      duration: "{{ bypass_dauer }}"
+
+      # ---------------- Nachlauf abgelaufen ----------------
+      - conditions:
+          - "{{ trigger.id == 'nachlauf_fertig' }}"
+          - condition: state
+            entity_id: !input modus
+            state: bewegung
+        sequence:
+          - action: light.turn_off
+            target: !input licht
+            data:
+              transition: 2
+          - action: input_select.select_option
+            target:
+              entity_id: !input modus
+            data:
+              option: automatik
+
+      # ---------------- Bypass abgelaufen ----------------
+      - conditions: "{{ trigger.id == 'bypass_fertig' }}"
+        sequence:
+          - action: light.turn_off
+            target: !input licht
+            data:
+              transition: 2
+          - action: input_select.select_option
+            target:
+              entity_id: !input modus
+            data:
+              option: automatik
+
+      # ---------------- Taste kurz: Ein / Aus mit Bypass ----------------
+      - conditions:
+          - "{{ trigger.id in ['oben', 'unten'] }}"
+          - "{{ trigger.to_state.attributes.event_type == event_kurz }}"
+        sequence:
+          - action: timer.cancel
+            target:
+              entity_id:
+                - !input timer_nachlauf
+                - !input timer_bypass
+          - choose:
+              - conditions: "{{ trigger.id == 'oben' }}"
+                sequence:
+                  - action: light.turn_on
+                    target: !input licht
+                    data:
+                      brightness_pct: "{{ states(helligkeit_schalter) | int(80) }}"
+                      transition: 0.5
+                  - action: input_select.select_option
+                    target:
+                      entity_id: !input modus
+                    data:
+                      option: schalter_an
+              - conditions: "{{ trigger.id == 'unten' }}"
+                sequence:
+                  - action: light.turn_off
+                    target: !input licht
+                    data:
+                      transition: 0.5
+                  - action: input_select.select_option
+                    target:
+                      entity_id: !input modus
+                    data:
+                      option: schalter_aus
+          - if:
+              - condition: state
+                entity_id: !input bewegungsmelder
+                state: "off"
+            then:
+              - action: timer.start
+                target:
+                  entity_id: !input timer_bypass
+                data:
+                  duration: "{{ bypass_dauer }}"
+
+      # ---------------- Taste lang: Dimmen + Lernen ----------------
+      - conditions:
+          - "{{ trigger.id in ['oben', 'unten'] }}"
+          - "{{ trigger.to_state.attributes.event_type == event_lang }}"
+        sequence:
+          - variables:
+              taste: "{{ trigger.entity_id }}"
+              richtung: "{{ 1 if trigger.id == 'oben' else -1 }}"
+          # Licht aus und "heller" gehalten → bei 1 % starten, Schalter-Modus
+          - if:
+              - "{{ richtung == 1 and licht_entity is not none and is_state(licht_entity, 'off') }}"
+            then:
+              - action: timer.cancel
+                target:
+                  entity_id:
+                    - !input timer_nachlauf
+                    - !input timer_bypass
+              - action: light.turn_on
+                target: !input licht
+                data:
+                  brightness_pct: 1
+              - action: input_select.select_option
+                target:
+                  entity_id: !input modus
+                data:
+                  option: schalter_an
+          # Schrittweise dimmen, solange die Taste gehalten wird
+          - repeat:
+              while:
+                - "{{ state_attr(taste, 'event_type') == event_lang }}"
+                - "{{ repeat.index <= 60 }}"
+              sequence:
+                - action: light.turn_on
+                  target: !input licht
+                  data:
+                    brightness_step_pct: "{{ richtung * (dimm_schritt | int) }}"
+                    transition: "{{ (dimm_intervall_ms | int) / 1000 }}"
+                - delay:
+                    milliseconds: "{{ dimm_intervall_ms | int }}"
+          # Gelernte Helligkeit speichern
+          - variables:
+              aktuell: >
+                {{ ((state_attr(licht_entity, 'brightness') | int(0)) / 255 * 100) | round(0) | int
+                   if licht_entity is not none else 0 }}
+          - if:
+              - "{{ aktuell > 0 }}"
+            then:
+              - choose:
+                  - conditions:
+                      - condition: state
+                        entity_id: !input modus
+                        state: schalter_an
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: !input helligkeit_schalter
+                        data:
+                          value: "{{ aktuell }}"
+                  - conditions:
+                      - condition: state
+                        entity_id: !input modus
+                        state: bewegung
+                      - "{{ not ist_nacht }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: !input helligkeit_bewegung
+                        data:
+                          value: "{{ aktuell }}"
+                  - conditions:
+                      - condition: state
+                        entity_id: !input modus
+                        state: bewegung
+                      - "{{ ist_nacht and nacht_lernen }}"
+                    sequence:
+                      - action: input_number.set_value
+                        target:
+                          entity_id: !input helligkeit_bewegung_nacht
+                        data:
+                          value: "{{ aktuell }}"

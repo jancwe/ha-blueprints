@@ -1,0 +1,21 @@
+# Beispiel: Automation, die den Blueprint verwendet
+automation:
+  - alias: Wohnzimmer Licht (BILRESA + MYGGBETT)
+    use_blueprint:
+      path: jancwe/bilresa_myggbett_light.yaml
+      input:
+        licht:
+          entity_id: light.wohnzimmer
+        bewegungsmelder: binary_sensor.myggbett_wohnzimmer_occupancy
+        taste_oben: event.bilresa_wohnzimmer_button_1
+        taste_unten: event.bilresa_wohnzimmer_button_2
+        modus: input_select.wz_licht_modus
+        helligkeit_schalter: input_number.wz_helligkeit_schalter
+        helligkeit_bewegung: input_number.wz_helligkeit_bewegung
+        helligkeit_bewegung_nacht: input_number.wz_helligkeit_bewegung_nacht
+        timer_nachlauf: timer.wz_licht_nachlauf
+        timer_bypass: timer.wz_bypass_reset
+        nacht_entity: schedule.wz_nacht
+        nachlauf_minuten: 4
+        bypass_minuten: 30
+        dimm_schritt: 8
